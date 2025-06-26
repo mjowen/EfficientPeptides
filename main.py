@@ -11,6 +11,29 @@ from Bio.Seq import Seq
 
 rng = np.random.default_rng()
 
+INPUT_FILE = os.environ.get("INPUT_FILE", "/work/inputs/canonical.pdb")
+if not os.path.isfile(INPUT_FILE):
+    raise ValueError(f"INPUT_FILE '{INPUT_FILE}' does not exist or is not a valid file.")
+
+POPULATION_SIZE = int(os.environ.get("POPULATION_SIZE", 200))
+if POPULATION_SIZE <= 0 or POPULATION_SIZE % 2 != 0:
+    raise ValueError("POPULATION_SIZE must be a positive even number.")
+
+NUM_GENERATIONS = int(os.environ.get("NUM_GENERATIONS", 1000))
+if NUM_GENERATIONS <= 0:
+    raise ValueError("NUM_GENERATIONS must be a positive integer.")
+
+MIN_NUM_ELITES = int(os.environ.get("MIN_NUM_ELITES", 10))
+if MIN_NUM_ELITES < 0:
+    raise ValueError("MIN_NUM_ELITES must be a non-negative integer.")
+
+TM_THRESHOLD = int(os.environ.get("TM_THRESHOLD", 5))
+if TM_THRESHOLD < 0 or TM_THRESHOLD > 100:
+    raise ValueError("TM_THRESHOLD must be between 0 and 100.")
+
+MASK_POSITIONS = os.environ.get("MASK_POSITIONS", "")
+MASK_POSITIONS = [int(pos) for pos in MASK_POSITIONS.split(",") if pos]
+
 
 def align(file1, file2):
     chain1 = next(get_structure(file1).get_chains())
@@ -53,7 +76,7 @@ def solve_strucutures(input_file, output_title):
     os.system(f"rm -rd /work/outputs/{output_title}/*__env")
     os.system(f"rm -rd /work/outputs/{output_title}/*.png")
     os.system(f"rm -rd /work/outputs/{output_title}/*.done.txt")
-    for i in range(200):
+    for i in range(POPULATION_SIZE):
         os.system(f"mv /work/outputs/{output_title}/{i}*_alphafold2_ptm_model_1*.pdb /work/outputs/{output_title}/predicted_{i}.pdb")
 
 
@@ -189,11 +212,10 @@ def set_elites(population, elites):
     Returns:
         list: New population with elites added.
     """
-    min_n_of_elites = 10
     # How many elites to keep
-    if len(elites) - len(population) < min_n_of_elites: # Make sure we have at least `min_n_of_elites` elites
+    if len(elites) - len(population) < MIN_NUM_ELITES: # Make sure we have at least `min_n_of_elites` elites
         population.sort(key=protein_cost)
-        population = population[:len(elites)-min]
+        population = population[:len(elites) - MIN_NUM_ELITES]
     elite_count = len(elites)-len(population)
     # Sort the population by cost
     elites.sort(key=protein_cost)
@@ -211,13 +233,13 @@ def optimise(file):
     """
     # Get the TM-score threshold
     _, canonical_seq = get_seq_and_coords(file)
-    population = [copy.copy(canonical_seq) for _ in range(200)]
+    population = [copy.copy(canonical_seq) for _ in range(POPULATION_SIZE)]
     write_fasta("/work/inputs/initial_population.fasta", population)
     solve_strucutures("initial_population.fasta", "gen_-1")
     # Compare the structures to the canonical coords for the TM score distribution
-    res = [align(file, f"/work/outputs/predicted_{i}.pdb") for i in range(200)]
-    tm_threshold = np.percentile(res, 5) # Set the TM-score threshold to the 5th percentile
-    for gen in range(1, 1000):
+    res = [align(file, f"/work/outputs/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
+    tm_threshold = np.percentile(res, TM_THRESHOLD) # Set the TM-score threshold to the 5th percentile
+    for gen in range(1, NUM_GENERATIONS):
         print(f"Generation {gen}")
         # Save pop to pass elites
         print("Population size:", len(population))
@@ -227,11 +249,11 @@ def optimise(file):
         # Crossover
         newpop = crossover(newpop)
         # Mutate the sequences
-        newpop = mutate(newpop, mask=[0,1,2,62,63,64,65,66,67,68,235,236,237]) # First amino acid, SYG chromophore, last amino acid, neighbouring 2 amino acids on each side
+        newpop = mutate(newpop, mask=MASK_POSITIONS)
         write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
         solve_strucutures(f"trial_population_{gen}.fasta", f"gen_{gen}")
         # Compare the structures to the canonical coords for the TM score distribution
-        res = [align(file, f"/work/outputs/gen_{gen}/predicted_{i}.pdb") for i in range(200)]
+        res = [align(file, f"/work/outputs/gen_{gen}/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
         print("TM Scores:", res)
         # Remove any sequences that are too structurally distinct from the canonical sequence
         newpop = [seq for seq, tm in zip(newpop, res) if tm > tm_threshold]
@@ -239,5 +261,5 @@ def optimise(file):
         population = set_elites(newpop, elites)
     return population
 
-optimise("/work/inputs/canonical.pdb")
+optimise(INPUT_FILE)
 # TODO add logging statements
