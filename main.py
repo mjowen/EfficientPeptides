@@ -68,16 +68,23 @@ def write_fasta(file, seqs):
         SeqIO.write(records, f, "fasta")
 
 
-def solve_strucutures(input_file, output_title):
-    os.system(f"colabfold_batch --num-models 1 /work/inputs/{input_file} /work/outputs/{output_title}")
+def solve_structures(input_file, output_title):
+    if "initial_population" in input_file:
+        for i in range(POPULATION_SIZE):
+            os.system(f"colabfold_batch --num-models 1 --seed {i} /work/inputs/{input_file} /work/outputs/{output_title}")
+            # Rename model files
+            os.system(f"mv /work/outputs/{output_title}/*_alphafold2_ptm_model_1_seed_{i:03}.pdb /work/outputs/{output_title}/predicted_{i}.pdb")
+    else:
+        os.system(f"colabfold_batch --num-models 1 /work/inputs/{input_file} /work/outputs/{output_title}")
+        # Rename model files
+        for i in range(POPULATION_SIZE):
+            os.system(f"mv /work/outputs/{output_title}/{i}*_alphafold2_ptm_model_1*.pdb /work/outputs/{output_title}/predicted_{i}.pdb")
     # Rename files and delete unnecessary files
     os.system(f"rm /work/outputs/{output_title}/*.a3m")
     os.system(f"rm /work/outputs/{output_title}/*.json")
     os.system(f"rm -rd /work/outputs/{output_title}/*__env")
     os.system(f"rm -rd /work/outputs/{output_title}/*.png")
     os.system(f"rm -rd /work/outputs/{output_title}/*.done.txt")
-    for i in range(POPULATION_SIZE):
-        os.system(f"mv /work/outputs/{output_title}/{i}*_alphafold2_ptm_model_1*.pdb /work/outputs/{output_title}/predicted_{i}.pdb")
 
 
 def protein_cost(seq):
@@ -234,8 +241,8 @@ def optimise(file):
     # Get the TM-score threshold
     _, canonical_seq = get_seq_and_coords(file)
     population = [copy.copy(canonical_seq) for _ in range(POPULATION_SIZE)]
-    write_fasta("/work/inputs/initial_population.fasta", population)
-    solve_strucutures("initial_population.fasta", "gen_-1")
+    write_fasta("/work/inputs/initial_population.fasta", [population[0]])
+    solve_structures("initial_population.fasta", "gen_-1")
     # Compare the structures to the canonical coords for the TM score distribution
     res = [align(file, f"/work/outputs/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
     tm_threshold = np.percentile(res, TM_THRESHOLD) # Set the TM-score threshold to the 5th percentile
@@ -251,7 +258,7 @@ def optimise(file):
         # Mutate the sequences
         newpop = mutate(newpop, mask=MASK_POSITIONS)
         write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
-        solve_strucutures(f"trial_population_{gen}.fasta", f"gen_{gen}")
+        solve_structures(f"trial_population_{gen}.fasta", f"gen_{gen}")
         # Compare the structures to the canonical coords for the TM score distribution
         res = [align(file, f"/work/outputs/gen_{gen}/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
         print("TM Scores:", res)
