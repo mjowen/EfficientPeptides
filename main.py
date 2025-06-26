@@ -74,8 +74,10 @@ def protein_cost(seq):
                 "M": 0.71, "F": 0.57, "P": 1, "S": 2, 
                 "T": 1.37, "W": 0.44, "Y": 0.57, "V": 1.0}
     cost = 0
-    for aa in seq: # TODO I think the yields already account for the atp consumed (just not released)
-        cost += 26/yields[aa] + atp_cost[aa] + 4.2 # Opportunity cost due to consumed glucose + ATP consumed/released + Polymerisation cost
+    for aa in seq:
+        if aa == "-":
+            continue
+        cost += 26/yields[aa.upper()] + min(atp_cost[aa.upper()],0) + 4.2 # Opportunity cost due to consumed glucose + ATP consumed/released [consumed already accounted for in yields] + Polymerisation cost
     return cost
 
 
@@ -236,6 +238,6 @@ def optimise(file):
         population = set_elites(newpop, elites)
     return population
 
-optimise("data/pdb/gfp_1.fasta")
+optimise("data/pdb/gfp_1.pdb")
 # TODO add to dockerfile
 # TODO add logging statements
