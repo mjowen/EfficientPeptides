@@ -4,7 +4,6 @@ import numpy as np
 import re
 import blosum
 
-print("Current Working Directory:", os.getcwd())
 from tmtools.io import get_structure, get_residue_data
 from tmtools import tm_align
 from Bio import SeqIO
@@ -47,13 +46,7 @@ def write_fasta(file, seqs):
 
 
 def solve_strucutures(input_file, output_title):
-#     os.system(f"""
-#         docker run --user $(id -u) -ti --rm --runtime=nvidia --gpus 1 \
-# /data/ssd1/qr24461/af/cache:/cache:rw \
-# /data/ssd1/qr24461/af/work:/work:rw \
-# ghcr.io/sokrypton/colabfold:1.5.5-cuda12.2.2 \
-# colabfold_batch /work/inputs/{input_file} /work/outputs/{output_title}""")
-    pass
+    os.system(f"colabfold_batch /work/inputs/{input_file} /work/outputs/{output_title}")
 
 
 def protein_cost(seq):
@@ -215,7 +208,7 @@ def optimise(file):
     solve_strucutures("data/initial_population.fasta", "data/optimised")
     # Compare the structures to the canonical coords for the TM score distribution
     res = [align(file, f"data/pdb/gfp_{i}.pdb") for i in range(1, 200)]
-    tm_threshold = np.percentile(res, 5)  # Set the TM-score threshold to the 5th percentile
+    tm_threshold = np.percentile(res, 5) # Set the TM-score threshold to the 5th percentile
     for gen in range(1, 1000):
         print(f"Generation {gen}")
         # Save pop to pass elites
@@ -227,10 +220,10 @@ def optimise(file):
         newpop = crossover(newpop)
         # Mutate the sequences
         newpop = mutate(newpop, mask=[0,1,2,62,63,64,65,66,67,68,235,236,237]) # First amino acid, SYG chromophore, last amino acid, neighbouring 2 amino acids on each side
-        write_fasta(f"data/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
-        solve_strucutures(f"data/trial_population_{gen}.fasta", f"data/optimised_gen_{gen}")
+        write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
+        solve_strucutures(f"trial_population_{gen}.fasta", f"gen_{gen}")
         # Compare the structures to the canonical coords for the TM score distribution
-        res = [align(file, f"data/pdb/gfp_{i}.pdb") for i in range(1, 200)] # TODO
+        res = [align(file, f"/work/outputs/gen_{gen}/gfp_{i}.pdb") for i in range(1, 200)]
         print("TM Scores:", res)
         # Remove any sequences that are too structurally distinct from the canonical sequence
         newpop = [seq for seq, tm in zip(newpop, res) if tm > tm_threshold]
