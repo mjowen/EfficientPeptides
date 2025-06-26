@@ -1,6 +1,7 @@
 import os
 import copy
 import numpy as np
+import re
 import blosum
 
 print("Current Working Directory:", os.getcwd())
@@ -40,7 +41,7 @@ def write_fasta(file, seqs):
         file (str): Path to the output FASTA file.
         seqs (list): Sequences to write.
     """
-    records = [SeqIO.SeqRecord(Seq(seq), id=str(i)) for i, seq in enumerate(seqs)]
+    records = [SeqIO.SeqRecord(Seq(seq.upper().replace("-","")), id=str(i)) for i, seq in enumerate(seqs)]
     with open(file, 'w') as f:
         SeqIO.write(records, f, "fasta")
 
@@ -114,11 +115,14 @@ def crossover(population):
         seq1 = population[i]
         seq2 = population[i + 1]
         # Perform crossover at a random point
-        crossover_point = np.random.randint(1, len(seq1) - 1)
-        new_seq1 = seq1[:crossover_point] + seq2[crossover_point:]
-        new_seq2 = seq2[:crossover_point] + seq1[crossover_point:]
-        population[i] = new_seq1
-        population[i + 1] = new_seq2
+        # Split the sequences into parts based on uppercase amino acids
+        new_seq1 = re.split(r"(?=[A-Z\-])", seq1)
+        new_seq2 = re.split(r"(?=[A-Z\-])", seq2)
+        crossover_point = rng.integers(1, len(new_seq1)) # Random crossover point
+        new_seq1 = new_seq1[:crossover_point] + new_seq2[crossover_point:]
+        new_seq2 = new_seq2[:crossover_point] + new_seq1[crossover_point:]
+        population[i] = "".join(new_seq1)
+        population[i + 1] = "".join(new_seq2)
     return population
 
 # Remove amino acid groups from the matrix
@@ -126,10 +130,10 @@ matrix = blosum.BLOSUM(62)
 for aas in matrix.keys():
     for aa in ["B", "J", "Z", "X"]:
         del matrix[aas][aa]
-for aa in ["B", "J", "Z", "X"]:
+for aa in ["B", "J", "Z", "X", "*"]:
     del matrix[aa]
 
-def mutate(population):
+def mutate(population, mask=[]):
     """Mutate a population of sequences using the BLOSUM62 substitution matrix.
     Args:
         seq (str): Input sequence to mutate.
@@ -139,19 +143,37 @@ def mutate(population):
     newpop = []
     for seq in population:
         newseq = ""
+        canonical_counter = 0
         for aa in seq:
-            weights = np.array([2**i for i in matrix[aa].values()])
+            # If it is masked, move on to the next amino acid
+            if aa.isupper() or aa == "-":
+                if canonical_counter in mask:
+                    newseq += aa
+                    canonical_counter += 1
+                    continue
+                canonical_counter += 1
+            # If it is a deletion, move on to the next amino acid
+            if aa == "-":
+                newseq += "-"
+                continue
+            weights = np.array([2**i for i in matrix[aa.upper()].values()])
             weights = weights / np.sum(weights)
-            new_aa = np.random.choice(list(matrix[aa].keys()), p=weights)
+            if aa.islower():
+                new_aa = np.random.choice(list(matrix[aa.upper()].keys()), p=weights).lower()
+            else:
+                new_aa = np.random.choice(list(matrix[aa].keys()), p=weights)
             if new_aa != "*":
                 newseq += new_aa
             else:
                 # Insertion or deletion
                 if np.random.rand() < 0.1:  # 10% chance to insert
                     newseq += aa  # Keep the original amino acid
-                    # Insert random amino acid after
-                    newseq += np.random.choice(list(matrix.keys()))
-                # Deletion is the same as not doing anything
+                    # Insert random amino acid after, lowercase to indicate insertion
+                    newseq += np.random.choice(list(matrix.keys())).lower()
+                else:
+                    # Deletion is still marked by a dash if it is canonical
+                    if aa.isupper():
+                        newseq += "-"
         newpop.append(newseq)
     return newpop
 
@@ -202,7 +224,7 @@ def optimise(file):
         # Crossover
         newpop = crossover(newpop)
         # Mutate the sequences
-        newpop = mutate(newpop)
+        newpop = mutate(newpop, mask=[0,1,2,62,63,64,65,66,67,68,235,236,237]) # First amino acid, SYG chromophore, last amino acid, neighbouring 2 amino acids on each side
         write_fasta(f"data/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
         solve_strucutures(f"data/trial_population_{gen}.fasta", f"data/optimised_gen_{gen}")
         # Compare the structures to the canonical coords for the TM score distribution
@@ -214,8 +236,6 @@ def optimise(file):
         population = set_elites(newpop, elites)
     return population
 
-optimise("data/pdb/gfp_1.pdb")
-
-# TODO add masking to avoid changing some residues
+optimise("data/pdb/gfp_1.fasta")
 # TODO add to dockerfile
 # TODO add logging statements
