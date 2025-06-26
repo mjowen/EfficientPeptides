@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy the Python files into the container
 COPY main.py /app/
 
+# Set executable permissions for main.py
+RUN chmod +x /app/main.py
+
 # Install dependencies from a local requirements.txt
 COPY requirements.txt /app/
 RUN pip install -r requirements.txt
