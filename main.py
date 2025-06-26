@@ -46,7 +46,7 @@ def write_fasta(file, seqs):
 
 
 def solve_strucutures(input_file, output_title):
-    os.system(f"colabfold_batch /work/inputs/{input_file} /work/outputs/{output_title}")
+    os.system(f"colabfold_batch --num-models 1 /work/inputs/{input_file} /work/outputs/{output_title}")
 
 
 def protein_cost(seq):
