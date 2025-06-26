@@ -8,7 +8,7 @@ WORKDIR /app
 COPY main.py /app/
 
 # Set executable permissions for main.py
-RUN chmod +x /app/main.py
+RUN chmod 755 /app/main.py
 
 # Install dependencies from a local requirements.txt
 COPY requirements.txt /app/
