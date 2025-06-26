@@ -240,5 +240,4 @@ def optimise(file):
     return population
 
 optimise("/work/inputs/canonical.pdb")
-# TODO add to dockerfile
 # TODO add logging statements
