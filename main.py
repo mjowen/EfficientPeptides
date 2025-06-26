@@ -204,10 +204,10 @@ def optimise(file):
     # Get the TM-score threshold
     _, canonical_seq = get_seq_and_coords(file)
     population = [copy.copy(canonical_seq) for _ in range(200)]
-    write_fasta("data/initial_population.fasta", population)
-    solve_strucutures("data/initial_population.fasta", "data/optimised")
+    write_fasta("/work/inputs/initial_population.fasta", population)
+    solve_strucutures("initial_population.fasta", "gen_-1")
     # Compare the structures to the canonical coords for the TM score distribution
-    res = [align(file, f"data/pdb/gfp_{i}.pdb") for i in range(1, 200)]
+    res = [align(file, f"/work/outputs/gfp_{i}.pdb") for i in range(1, 200)]
     tm_threshold = np.percentile(res, 5) # Set the TM-score threshold to the 5th percentile
     for gen in range(1, 1000):
         print(f"Generation {gen}")
