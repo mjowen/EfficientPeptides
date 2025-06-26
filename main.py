@@ -231,6 +231,6 @@ def optimise(file):
         population = set_elites(newpop, elites)
     return population
 
-optimise("data/pdb/gfp_1.pdb")
+optimise("/work/inputs/canonical.pdb")
 # TODO add to dockerfile
 # TODO add logging statements
