@@ -246,7 +246,7 @@ def optimise(file):
     population = [copy.copy(canonical_seq) for _ in range(POPULATION_SIZE)]
     write_fasta("/work/inputs/initial_population.fasta", [population[0]])
     solve_structures("initial_population.fasta", "gen_-1")
-
+    print("Mask positions:", MASK_POSITIONS)
     # Compare the structures to the canonical coords for the TM score distribution
     res = [align(file, f"/work/outputs/gen_-1/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
     print(f"TM Scores for initial population:")
