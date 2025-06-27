@@ -71,8 +71,8 @@ def write_fasta(file, seqs):
 
 def solve_structures(input_file, output_title):
     if "initial_population" in input_file:
+        os.system(f"colabfold_batch --num-models 1 --num-seeds {POPULATION_SIZE} /work/inputs/{input_file} /work/outputs/{output_title}")
         for i in range(POPULATION_SIZE):
-            os.system(f"colabfold_batch --num-models 1 --seed {i} /work/inputs/{input_file} /work/outputs/{output_title}")
             # Rename model files
             os.system(f"mv /work/outputs/{output_title}/*_alphafold2_ptm_model_1_seed_{i:03}.pdb /work/outputs/{output_title}/predicted_{i}.pdb")
     else:
