@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import re
 import blosum
+import time
 
 from tmtools.io import get_structure, get_residue_data
 from tmtools import tm_align
@@ -226,8 +227,10 @@ def set_elites(population, elites):
     elite_count = len(elites)-len(population)
     # Sort the population by cost
     elites.sort(key=protein_cost)
+    print("Adding the following elites")
     for i in range(elite_count):
         population.append(elites[i])
+        print(elites[i])
     return population
 
 
@@ -243,30 +246,53 @@ def optimise(file):
     population = [copy.copy(canonical_seq) for _ in range(POPULATION_SIZE)]
     write_fasta("/work/inputs/initial_population.fasta", [population[0]])
     solve_structures("initial_population.fasta", "gen_-1")
+
     # Compare the structures to the canonical coords for the TM score distribution
     res = [align(file, f"/work/outputs/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
+    print(f"TM Scores for initial population:")
+    for i, tm in enumerate(res):
+        print(f"Predicted {i}: {tm:.3f}")
     tm_threshold = np.percentile(res, TM_THRESHOLD) # Set the TM-score threshold to the 5th percentile
+    print(f"TM score threshold for selection: {tm_threshold:.3f}")
     for gen in range(1, NUM_GENERATIONS):
+        # Log time
+        start_time = time.time()
         print(f"Generation {gen}")
+        print(f"Population size: {len(population)}")
+        print(f"Number of unique individuals at start of generation: {len(set(population))}")
+        print(f"Protein cost: {np.mean([protein_cost(seq) for seq in population]):.2f} ± {np.std([protein_cost(seq) for seq in population]):.2f}")
+
         # Save pop to pass elites
-        print("Population size:", len(population))
         elites = copy.deepcopy(population)
+
         # Tournament selection
         newpop = tournament_selection(population)
+
         # Crossover
         newpop = crossover(newpop)
+
         # Mutate the sequences
         newpop = mutate(newpop, mask=MASK_POSITIONS)
-        write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop) # TODO I dont need to check the constraint against sequences that I've already checked
+
+        print(f"Number of unique individuals before solving structures: {len(set(newpop))}")
+        write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop)
         solve_structures(f"trial_population_{gen}.fasta", f"gen_{gen}")
+
         # Compare the structures to the canonical coords for the TM score distribution
         res = [align(file, f"/work/outputs/gen_{gen}/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
-        print("TM Scores:", res)
+        print(f"TM Scores for generation {gen}:")
+        for i, tm in enumerate(res):
+            print(f"Predicted {i}: {tm:.3f}")
+        print(f"Removing {sum([tm <= tm_threshold for tm in res])} sequences with TM score below threshold {tm_threshold:.3f}")
         # Remove any sequences that are too structurally distinct from the canonical sequence
         newpop = [seq for seq, tm in zip(newpop, res) if tm > tm_threshold]
+
         # Add elites to fill population
         population = set_elites(newpop, elites)
+        print(f"Time to compute generation {gen}: {time.time() - start_time:.2f} seconds")
+    print("Printing final population")
+    for i in range(len(population)):
+        print(f"Sequence {i}: {population[i]}")
     return population
 
 optimise(INPUT_FILE)
-# TODO add logging statements
