@@ -248,7 +248,7 @@ def optimise(file):
     solve_structures("initial_population.fasta", "gen_-1")
 
     # Compare the structures to the canonical coords for the TM score distribution
-    res = [align(file, f"/work/outputs/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
+    res = [align(file, f"/work/outputs/gen_-1/predicted_{i}.pdb") for i in range(POPULATION_SIZE)]
     print(f"TM Scores for initial population:")
     for i, tm in enumerate(res):
         print(f"Predicted {i}: {tm:.3f}")
@@ -275,7 +275,7 @@ def optimise(file):
         newpop = mutate(newpop, mask=MASK_POSITIONS)
 
         print(f"Number of unique individuals before solving structures: {len(set(newpop))}")
-        write_fasta(f"/work/inputs/trail_population_{gen}.fasta", newpop)
+        write_fasta(f"/work/inputs/trial_population_{gen}.fasta", newpop)
         solve_structures(f"trial_population_{gen}.fasta", f"gen_{gen}")
 
         # Compare the structures to the canonical coords for the TM score distribution
